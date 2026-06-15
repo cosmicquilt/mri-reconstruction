@@ -1,0 +1,18 @@
+# Pinned-ish for reproducibility. Python 3.10 or 3.11 recommended
+# (PyTorch does not yet ship wheels for 3.14).
+#
+# The pure-NumPy core (FFT, masking, metrics, QC, data consistency) and the smoke
+# test need only the first two lines; the rest enable training and figures.
+numpy>=1.23,<2.3
+pyyaml>=6.0
+
+# data + deep learning
+h5py>=3.7
+torch>=2.0          # for GPU builds see https://pytorch.org/get-started/locally/
+
+# metrics + visualization
+scikit-image>=0.20  # canonical SSIM (a NumPy fallback is used if absent)
+matplotlib>=3.6
+
+# tests
+pytest>=7.0

@@ -1,0 +1,42 @@
+# stage 2 unet baseline at 4x point data.source at fastmri once downloaded
+seed: 42
+device: auto
+
+mask:
+  type: random
+  center_fractions: [0.08]
+  accelerations: [4]
+
+data:
+  source: fastmri
+  crop: [320, 320]
+  root: /data/fastmri
+  train_dir: singlecoil_train
+  val_dir: singlecoil_val
+  train_limit: 800
+  val_limit: 200
+  center_slice_frac: 0.8
+
+model:
+  name: unet
+  unet: {in_chans: 1, out_chans: 1, chans: 32, num_pool_layers: 4, drop_prob: 0.0}
+
+train:
+  epochs: 50
+  batch_size: 16        # unet works on fixed-size crops so batching is fine
+  lr: 0.001
+  weight_decay: 0.0
+  loss: l1
+  num_workers: 4
+  amp: true             # unet is autocast-safe enable on ampere+ gpus
+  amp_dtype: bf16       # use fp16 on t4 (no bf16)
+
+eval:
+  batch_size: 16
+  methods: [zero_filled, unet]
+  accelerations: [4, 8]
+  center_fractions: [0.08, 0.04]
+  plot_metric: ssim
+
+output:
+  dir: results/unet_4x

@@ -1,0 +1,70 @@
+# default config synthetic data unet 4x acceleration
+# every run driven by a file like this override any field from the cli with
+#   --set train.epochs=5 --set data.source=fastmri
+# so experiments reproducible from (config + overrides + seed) alone
+
+seed: 42
+device: auto            # auto | cuda | cpu
+
+# --- undersampling ---
+mask:
+  type: random          # random | equispaced
+  center_fractions: [0.08]   # fraction of central (low-freq) columns always kept
+  accelerations: [4]         # target acceleration factor r
+
+# --- data ---
+data:
+  source: synthetic     # synthetic (phantoms no download) | fastmri (.h5 files)
+  crop: [256, 256]      # image-domain crop for target/zero-filled (fastmri [320, 320])
+  # synthetic-only
+  synthetic_shape: [256, 256]
+  train_size: 64
+  val_size: 16
+  # fastmri-only (uncomment and point at your download)
+  # root: /data/fastmri
+  # train_dir: singlecoil_train
+  # val_dir: singlecoil_val
+  # train_limit: 800     # use a subset (a few hundred to a couple thousand)
+  # val_limit: 200
+  # center_slice_frac: 0.8
+
+# --- model ---
+model:
+  name: unet            # unet | unrolled
+  unet:
+    in_chans: 1
+    out_chans: 1
+    chans: 32
+    num_pool_layers: 4
+    drop_prob: 0.0
+  unrolled:
+    num_cascades: 5
+    chans: 32
+    n_convs: 5
+    shared_weights: false
+    learnable_dc: true   # soft learnable data consistency (false = hard dc)
+    init_v: 0.95         # initial dc blend in (0,1) ~0.95 starts near hard dc
+
+# --- training ---
+train:
+  epochs: 30
+  batch_size: 8
+  lr: 0.001
+  weight_decay: 0.0
+  loss: l1              # l1 | ssim
+  num_workers: 0
+  amp: false           # mixed precision (unet only) big speedup on a100/h100/l4
+  amp_dtype: bf16      # bf16 (ampere+ recommended) | fp16 (t4/older)
+
+# --- evaluation ---
+eval:
+  batch_size: 8
+  methods: [zero_filled, unet, unrolled]
+  accelerations: [4, 8]
+  center_fractions: [0.08, 0.04]
+  plot_metric: ssim
+  checkpoints: {}        # method -> checkpoint path e.g. {unet: results/unet_4x/best.pt}
+
+# --- output ---
+output:
+  dir: results/default

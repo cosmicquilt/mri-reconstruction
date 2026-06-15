@@ -1,0 +1,33 @@
+# evaluation across methods x accelerations -> metrics table + figures
+#   python -m mri_recon.cli eval    --config configs/eval.yaml
+#   python -m mri_recon.cli figures --config configs/eval.yaml
+# fill in eval.checkpoints with the paths written by your training runs
+seed: 42
+device: auto
+
+mask:
+  type: random
+  center_fractions: [0.08]
+  accelerations: [4]
+
+data:
+  source: synthetic       # switch to fastmri (+ root/dirs) for the real table
+  crop: [256, 256]
+  synthetic_shape: [256, 256]
+  val_size: 32
+
+model:
+  name: unet
+  unet: {in_chans: 1, out_chans: 1, chans: 16, num_pool_layers: 3, drop_prob: 0.0}
+  unrolled: {num_cascades: 3, chans: 16, n_convs: 5, shared_weights: false, learnable_dc: true, init_v: 0.95}
+
+eval:
+  batch_size: 8
+  methods: [zero_filled, unet, unrolled]
+  accelerations: [4, 8]
+  center_fractions: [0.08, 0.04]
+  plot_metric: ssim
+  checkpoints: {}        # e.g. {unet: results/synthetic/best.pt} or set via --set
+
+output:
+  dir: results/eval

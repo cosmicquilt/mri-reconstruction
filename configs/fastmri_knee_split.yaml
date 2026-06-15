@@ -1,0 +1,51 @@
+# fastmri knee single-coil train/val/test carved from one dir
+# download only knee_singlecoil_val ~15gb extract point split_dir at it
+# split is by volume no slice leakage
+# tuned for a100 drop batch_size / num_workers on a weaker gpu (notes inline)
+# unet @ 4x default unrolled @ 8x via cli overrides:
+#   python -m mri_recon.cli train --config configs/fastmri_knee_split.yaml \
+#     --set model.name=unrolled train.loss=ssim train.batch_size=1 \
+#           mask.accelerations=[8] mask.center_fractions=[0.04] \
+#           output.dir=results/knee_split_unrolled_8x
+seed: 42
+device: auto
+
+mask:
+  type: random
+  center_fractions: [0.08]
+  accelerations: [4]
+
+data:
+  source: fastmri
+  crop: [320, 320]
+  split_dir: data/fastmri/singlecoil_val   # extracted knee_singlecoil_val
+  split_fractions: [0.7, 0.15, 0.15]        # train val test by volume
+  split_seed: 0
+  train_limit: 800                          # cap slices raise for a fuller a100 run
+  val_limit: 200
+  center_slice_frac: 0.8
+
+model:
+  name: unet
+  unet: {in_chans: 1, out_chans: 1, chans: 32, num_pool_layers: 4, drop_prob: 0.0}
+  unrolled: {num_cascades: 5, chans: 32, n_convs: 5, shared_weights: false, learnable_dc: true, init_v: 0.95}
+
+train:
+  epochs: 50
+  batch_size: 32        # a100 drop to 8 16 on weaker gpu always 1 for unrolled
+  lr: 0.001
+  weight_decay: 0.0
+  loss: l1              # ssim for unrolled
+  num_workers: 8        # a100 drop to 2 4 on weaker gpu
+  amp: true             # bf16 mixed precision unet only auto fp32 for unrolled
+  amp_dtype: bf16       # fp16 on t4 no bf16
+
+eval:
+  batch_size: 32        # a100 drop on weaker gpu
+  methods: [zero_filled, unet]
+  accelerations: [4, 8]
+  center_fractions: [0.08, 0.04]
+  plot_metric: ssim
+
+output:
+  dir: results/knee_split_unet_4x

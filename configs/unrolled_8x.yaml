@@ -1,0 +1,49 @@
+# stage 3 unrolled dc-cnn at 8x (the centerpiece harder acceleration)
+# note real fastmri kspace slices vary in size and the unrolled model consumes
+# full kspace so use batch_size 1 on fastmri data (synthetic is fixed-size batches
+# at any size) start with num_cascades 1-2 to confirm it trains then add
+seed: 42
+device: auto
+
+mask:
+  type: random
+  center_fractions: [0.04]
+  accelerations: [8]
+
+data:
+  source: fastmri
+  crop: [320, 320]
+  root: /data/fastmri
+  train_dir: singlecoil_train
+  val_dir: singlecoil_val
+  train_limit: 800
+  val_limit: 200
+  center_slice_frac: 0.8
+
+model:
+  name: unrolled
+  unrolled:
+    num_cascades: 5
+    chans: 32
+    n_convs: 5
+    shared_weights: false
+    learnable_dc: true
+    init_v: 0.95
+
+train:
+  epochs: 50
+  batch_size: 1         # full-size kspace -> batch_size 1 on real data
+  lr: 0.0005
+  weight_decay: 0.0
+  loss: ssim            # train directly on the headline metric
+  num_workers: 4
+
+eval:
+  batch_size: 1
+  methods: [zero_filled, unrolled]
+  accelerations: [4, 8]
+  center_fractions: [0.08, 0.04]
+  plot_metric: ssim
+
+output:
+  dir: results/unrolled_8x
