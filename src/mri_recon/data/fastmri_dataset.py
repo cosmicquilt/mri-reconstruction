@@ -41,6 +41,14 @@ def make_sample_tensors(
     mask = expand_mask(col_mask, kspace_full.shape)
     masked_kspace = kspace_full * mask
 
+    # per-slice scale so values are O(1). real fastmri kspace is raw-scale (~1e-5)
+    # which makes the unrolled net and the ssim loss numerically unstable. divide
+    # kspace and image by the zero-filled max, scale-invariant for the metrics
+    # (ssim/psnr use data_range, nmse is a ratio) so synthetic numbers are unchanged
+    scale = float(np.abs(ifft2c(masked_kspace)).max()) + 1e-12
+    masked_kspace = masked_kspace / scale
+    kspace_full = kspace_full / scale
+
     # image-domain quantities centre-cropped to a fixed size for loss/metrics
     crop = (min(crop[0], kspace_full.shape[-2]), min(crop[1], kspace_full.shape[-1]))
     target = np.abs(center_crop(ifft2c(kspace_full), crop)).astype(np.float32)
