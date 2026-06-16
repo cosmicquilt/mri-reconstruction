@@ -101,7 +101,7 @@ def run_evaluation(cfg: dict, device) -> dict:
     """
     from torch.utils.data import DataLoader
 
-    from .data.fastmri_dataset import build_dataset
+    from .data.fastmri_dataset import build_dataset, collate_samples
     from .masking import build_mask_func
 
     methods = cfg["eval"]["methods"]
@@ -121,7 +121,9 @@ def run_evaluation(cfg: dict, device) -> dict:
             }
             mask_func = build_mask_func(mask_cfg)
             val_set = build_dataset(cfg["data"], mask_func, split="val")
-            loader = DataLoader(val_set, batch_size=cfg["eval"].get("batch_size", 1))
+            loader = DataLoader(
+                val_set, batch_size=cfg["eval"].get("batch_size", 1), collate_fn=collate_samples
+            )
             report = _qc.QCReport()
             scores = evaluate_loader(method, model, loader, device, report)
             results[method][accel] = scores

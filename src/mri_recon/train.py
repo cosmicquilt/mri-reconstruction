@@ -16,7 +16,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from .data.fastmri_dataset import build_dataset
+from .data.fastmri_dataset import build_dataset, collate_samples
 from .evaluate import evaluate_loader, reconstruct_batch
 from .masking import build_mask_func
 from .models import build_model
@@ -43,8 +43,11 @@ def train(cfg: dict) -> dict:
         shuffle=True,
         num_workers=cfg["train"].get("num_workers", 0),
         drop_last=False,
+        collate_fn=collate_samples,
     )
-    val_loader = DataLoader(val_set, batch_size=cfg["eval"].get("batch_size", 1))
+    val_loader = DataLoader(
+        val_set, batch_size=cfg["eval"].get("batch_size", 1), collate_fn=collate_samples
+    )
 
     kind = cfg["model"]["name"]
     model = build_model(kind, **cfg["model"].get(kind, {})).to(device)

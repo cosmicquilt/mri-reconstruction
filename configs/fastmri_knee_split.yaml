@@ -36,12 +36,12 @@ train:
   lr: 0.001
   weight_decay: 0.0
   loss: l1              # ssim for unrolled
-  num_workers: 8        # a100 drop to 2 4 on weaker gpu
+  num_workers: 2        # colab has 2 cpus raise on a bigger machine
   amp: true             # bf16 mixed precision unet only auto fp32 for unrolled
   amp_dtype: bf16       # fp16 on t4 no bf16
 
 eval:
-  batch_size: 32        # a100 drop on weaker gpu
+  batch_size: 1         # 1 so the unrolled model (variable-size kspace) evaluates
   methods: [zero_filled, unet]
   accelerations: [4, 8]
   center_fractions: [0.08, 0.04]

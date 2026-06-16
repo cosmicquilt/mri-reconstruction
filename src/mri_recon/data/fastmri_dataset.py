@@ -55,6 +55,28 @@ def make_sample_tensors(
     }
 
 
+def collate_samples(batch: list[dict]) -> dict:
+    """collate sample dicts tolerating variable-size fields
+
+    image-domain fields (target zf_image max_value) are a fixed crop and stack
+    normally full-size kspace fields (masked_kspace mask) vary across real knee
+    volumes (e.g. 640x368 vs 640x372) so they stack only when uniform (batch_size 1)
+    else stay a list the unet ignores them the unrolled model uses batch_size 1 so
+    its kspace is a single stacked tensor
+    """
+    out: dict = {}
+    for key in batch[0]:
+        vals = [b[key] for b in batch]
+        if isinstance(vals[0], torch.Tensor):
+            try:
+                out[key] = torch.stack(vals, 0)
+            except RuntimeError:
+                out[key] = vals  # variable-size full kspace, keep as a list
+        else:
+            out[key] = torch.tensor(vals)  # python scalars e.g. max_value
+    return out
+
+
 class SyntheticSliceDataset(Dataset):
     """fixed-size synthetic phantoms for smoke tests ci and offline demos"""
 
