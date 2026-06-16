@@ -212,6 +212,14 @@ def build_dataset(data_cfg: dict, mask_func: MaskFunc, split: str = "train") -> 
                 seed=data_cfg.get("split_seed", 0),
             )
             return FastMRISliceDataset(mask_func, files=splits[split], **common)
+        if not data_cfg.get("root"):
+            # split_dir and root both empty usually means --set data.split_dir=$DATA got an
+            # undefined shell var run the setup cell that defines DATA before training
+            raise ValueError(
+                "data.source=fastmri needs data.split_dir or data.root, both are unset/empty "
+                "(if --set data.split_dir=$DATA was used, $DATA was undefined; run the setup "
+                "cell that defines it first)."
+            )
         root = Path(data_cfg["root"]) / data_cfg.get(f"{split}_dir", f"singlecoil_{split}")
         return FastMRISliceDataset(mask_func, root=root, **common)
     raise ValueError(f"Unknown data.source {source!r} (use 'synthetic' or 'fastmri').")
