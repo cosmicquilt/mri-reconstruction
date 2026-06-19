@@ -121,8 +121,9 @@ icc(2,1). significance comes from a paired wilcoxon test and a linear mixed-effe
 | after combat | - | ~0.917 | **~0.940** |
 
 **despite the u-net's higher ssim/psnr, the unrolled preserves radiomic features
-significantly better** (linear mixed-effects: +0.037 mean ccc, 95% ci [0.026, 0.047],
-p < 1e-10 over 25 features x 3 seeds; all three seeds wilcoxon-significant). the gap is
+significantly better** (linear mixed-effects: +0.037 mean ccc, p < 0.001 across 25
+features and 3 seeds, significant whether seeds are averaged per feature or modeled as
+fixed effects; all three seeds are individually wilcoxon-significant). the gap is
 largest on **texture** (glcm, +0.058), consistent with l1 over-smoothing eroding the
 high-frequency detail glcm depends on, while first-order stability is comparable. combat
 harmonization recovers most of the systematic shift and the unrolled reaches a higher
@@ -133,9 +134,11 @@ constraint trades a little image-similarity for better biomarker fidelity.
 *caveats: a self-contained ibsi-style extractor (first-order + glcm, no wavelet/glrlm,
 since pyradiomics does not build on the colab python); the roi is fixed on the ground
 truth, so these ccc values isolate reconstruction from segmentation and are an upper
-bound on full-workflow stability; 100 val slices, single-coil 8x. an earlier
-"u-net below zero-filled on first-order" result was an artifact of per-roi normalization
-and vanished with whole-image normalization.*
+bound on full-workflow stability; 100 val slices, single-coil 8x. and in absolute terms
+the texture (glcm) cccs (~0.33-0.39) sit far below the ~0.85 reliability bar, so at 8x
+single-coil *both* models fail to preserve diagnostic texture, the unrolled simply
+degrades less. an earlier "u-net below zero-filled on first-order" result was an artifact
+of per-roi normalization and vanished with whole-image normalization.*
 
 ## the pipeline (this is a pipeline, not a notebook)
 
