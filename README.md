@@ -121,9 +121,9 @@ icc(2,1). significance comes from a paired wilcoxon test and a linear mixed-effe
 | after combat | - | ~0.917 | **~0.940** |
 
 **despite the u-net's higher ssim/psnr, the unrolled preserves radiomic features
-significantly better** (linear mixed-effects: +0.037 mean ccc, p < 0.001 across 25
-features and 3 seeds, significant whether seeds are averaged per feature or modeled as
-fixed effects; all three seeds are individually wilcoxon-significant). the gap is
+significantly better** (+0.037 mean ccc; a paired test over 25 seed-averaged features
+gives p = 1.2e-4 with 19 of 25 favoring the unrolled, and a linear mixed-effects model
+agrees; all three seeds are individually wilcoxon-significant). the gap is
 largest on **texture** (glcm, +0.058), consistent with l1 over-smoothing eroding the
 high-frequency detail glcm depends on, while first-order stability is comparable. combat
 harmonization recovers most of the systematic shift and the unrolled reaches a higher
