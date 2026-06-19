@@ -100,6 +100,43 @@ so the deliverable is a controlled, multi-seed, reproducible comparison that dis
 its own initial hypothesis. eval is bit-deterministic (verified by repeated runs);
 training variance is characterized rather than ignored.
 
+## downstream: which reconstruction preserves biomarkers?
+
+ssim/psnr score how an image *looks*; a quantitative pipeline cares whether the radiomic
+*features* survive. so each reconstruction is scored for feature stability: an roi is
+segmented once on the fully-sampled ground truth and reused unchanged on every recon
+(isolating reconstruction error from segmentation error), 25 ibsi-style features
+(first-order + haralick glcm, whole-image z-score, fixed bin width) are extracted, and
+agreement with the ground-truth feature is measured per feature by lin's ccc and
+icc(2,1). significance comes from a paired wilcoxon test and a linear mixed-effects model
+(method fixed effect, random intercept per feature) across 3 training seeds. code in
+`src/mri_recon/radiomics_stability.py`, run via `mri_recon.cli radiomics`.
+
+| median CCC (3 seeds) | zero-filled | u-net | unrolled |
+|---|---|---|---|
+| all (25 features) | 0.778 | 0.835 ± 0.007 | **0.862 ± 0.005** |
+| first-order (15) | 0.817 | 0.895 ± 0.005 | **0.904 ± 0.004** |
+| glcm texture (10) | 0.380 | 0.334 ± 0.021 | **0.392 ± 0.017** |
+| % features CCC > 0.85 | 28% | ~44% | **~56%** |
+| after combat | - | ~0.917 | **~0.940** |
+
+**despite the u-net's higher ssim/psnr, the unrolled preserves radiomic features
+significantly better** (linear mixed-effects: +0.037 mean ccc, 95% ci [0.026, 0.047],
+p < 1e-10 over 25 features x 3 seeds; all three seeds wilcoxon-significant). the gap is
+largest on **texture** (glcm, +0.058), consistent with l1 over-smoothing eroding the
+high-frequency detail glcm depends on, while first-order stability is comparable. combat
+harmonization recovers most of the systematic shift and the unrolled reaches a higher
+ceiling, so its residual signal is better preserved. the point: the metric you optimize
+(pixel error) is not the metric that matters downstream, and a data-consistency
+constraint trades a little image-similarity for better biomarker fidelity.
+
+*caveats: a self-contained ibsi-style extractor (first-order + glcm, no wavelet/glrlm,
+since pyradiomics does not build on the colab python); the roi is fixed on the ground
+truth, so these ccc values isolate reconstruction from segmentation and are an upper
+bound on full-workflow stability; 100 val slices, single-coil 8x. an earlier
+"u-net below zero-filled on first-order" result was an artifact of per-roi normalization
+and vanished with whole-image normalization.*
+
 ## the pipeline (this is a pipeline, not a notebook)
 
 ```
@@ -205,12 +242,13 @@ tests/     test_core.py
 ## status
 
 pipeline verified end-to-end (physics core unit-tested) and run on real fastmri
-single-coil knee. the controlled, multi-seed comparison above is the current result:
-**a well-trained u-net beats the small unrolled net at 8x single-coil, and the
-project documents the rigorous path (qc, confound isolation, variance
-characterization) used to establish that honestly.**
+single-coil knee. two results stand:
+- **image quality:** a well-trained u-net beats the small unrolled net at 8x
+  single-coil, established through a controlled, multi-seed comparison (qc, confound
+  isolation, variance characterization).
+- **downstream biomarkers:** the unrolled net preserves radiomic features
+  significantly better than the u-net (mixed-effects p < 1e-10), driven by texture, so
+  the image-quality winner is *not* the biomarker winner.
 
-next: a downstream **radiomic-feature-stability** analysis, measuring how each
-reconstruction perturbs quantitative imaging biomarkers (icc / ccc of pyradiomics
-features against the fully-sampled reference), which reframes "reconstruction quality"
-in the terms that actually matter for quantitative imaging.
+future: ibsi-standard pyradiomics with wavelet features (pending a python env it builds
+on), multi-coil reconstruction, and a clinical-task downstream metric.
