@@ -2,9 +2,11 @@
 # download only knee_singlecoil_val ~15gb extract point split_dir at it
 # split is by volume no slice leakage
 # tuned for a100 drop batch_size / num_workers on a weaker gpu (notes inline)
-# unet @ 4x default unrolled @ 8x via cli overrides:
+# controlled comparison: train both models with the SAME l1 loss at the SAME
+# acceleration so only the architecture varies (matched loss is what makes the
+# unet-vs-unrolled comparison fair). for the 8x in-distribution study:
 #   python -m mri_recon.cli train --config configs/fastmri_knee_split.yaml \
-#     --set model.name=unrolled train.loss=ssim train.batch_size=1 \
+#     --set model.name=unrolled train.batch_size=1 \
 #           mask.accelerations=[8] mask.center_fractions=[0.04] \
 #           output.dir=results/knee_split_unrolled_8x
 seed: 42
@@ -35,7 +37,7 @@ train:
   batch_size: 32        # a100 drop to 8 16 on weaker gpu always 1 for unrolled
   lr: 0.001
   weight_decay: 0.0
-  loss: l1              # ssim for unrolled
+  loss: l1              # matched across models for a fair architecture comparison
   num_workers: 2        # colab has 2 cpus raise on a bigger machine
   amp: true             # bf16 mixed precision unet only auto fp32 for unrolled
   amp_dtype: bf16       # fp16 on t4 no bf16
