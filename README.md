@@ -78,6 +78,8 @@ constraint is weak and parameter capacity wins. the unrolled nets that *do* beat
 u-nets in the literature use multi-coil physics, weight sharing, and many more
 cascades.
 
+![8x single-coil knee, in-distribution, mean and std over 3 seeds: both learned models clearly beat zero-filled, and the u-net edges the 54x-smaller unrolled net by a small but robust margin](docs/figures/seed_comparison_8x.png)
+
 ## the part worth your attention: how the number was earned
 
 reaching that honest result meant catching three confounds, each of which would have

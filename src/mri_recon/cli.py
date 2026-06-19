@@ -117,6 +117,17 @@ def _cmd_figures(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_radiomics(args: argparse.Namespace) -> int:
+    from .radiomics_stability import run_and_report
+    from .utils import get_device
+
+    cfg = load_config(args.config, args.set)
+    device = get_device(cfg.get("device", "auto"))
+    out_dir = Path(cfg.get("output", {}).get("dir", "results")) / "radiomics"
+    run_and_report(cfg, device, out_dir)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="mri_recon", description=__doc__)
     parser.add_argument("--log-level", default="INFO")
@@ -129,6 +140,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("train", _cmd_train, "train a model from a config"),
         ("eval", _cmd_eval, "evaluate methods x accelerations -> metrics table"),
         ("figures", _cmd_figures, "render comparison panel + metric plot"),
+        ("radiomics", _cmd_radiomics, "downstream radiomic feature stability vs ground truth"),
     ]:
         p = sub.add_parser(name, help=helptext)
         p.add_argument("--config", required=True, help="path to a YAML config")

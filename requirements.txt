@@ -16,3 +16,9 @@ matplotlib>=3.6
 
 # tests
 pytest>=7.0
+
+# downstream radiomic-feature-stability analysis (src/mri_recon/radiomics_stability.py)
+# both optional: the module uses a self-contained numpy extractor if pyradiomics is
+# absent, and scipy ships with scikit-image anyway
+scipy>=1.9            # roi morphology
+pyradiomics>=3.0      # ibsi feature extraction (first-order + texture + wavelet)
