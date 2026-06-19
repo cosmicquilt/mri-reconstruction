@@ -120,6 +120,8 @@ icc(2,1). significance comes from a paired wilcoxon test and a linear mixed-effe
 | % features CCC > 0.85 | 28% | ~44% | **~56%** |
 | after combat | - | ~0.917 | **~0.940** |
 
+![per-class median radiomic-feature CCC vs ground truth at 8x: first-order is high for both learned models (above the 0.85 excellent-reproducibility line), GLCM texture sits far below it for every method with the unrolled highest and the u-net lowest (below even zero-filled)](docs/figures/radiomics_class_ccc.png)
+
 **despite the u-net's higher ssim/psnr, the unrolled preserves radiomic features
 significantly better** (+0.037 mean ccc; a paired test over 25 seed-averaged features
 gives p = 1.2e-4 with 19 of 25 favoring the unrolled, and a linear mixed-effects model
