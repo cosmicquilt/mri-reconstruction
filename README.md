@@ -127,7 +127,10 @@ significantly better** (+0.037 mean ccc; a paired test over 25 seed-averaged fea
 gives p = 1.2e-4 with 19 of 25 favoring the unrolled, and a linear mixed-effects model
 agrees; all three seeds are individually wilcoxon-significant). the gap is
 largest on **texture** (glcm, +0.058), consistent with l1 over-smoothing eroding the
-high-frequency detail glcm depends on, while first-order stability is comparable. combat
+high-frequency detail glcm depends on, while first-order stability is comparable. the u-net even falls *below* zero-filled on
+texture: non-linear smoothing decorrelates texture features from the true content, whereas
+linear zero-filling (ugly aliasing and all) preserves their cross-slice correlation
+structure. combat
 harmonization recovers most of the systematic shift and the unrolled reaches a higher
 ceiling, so its residual signal is better preserved. the point: the metric you optimize
 (pixel error) is not the metric that matters downstream, and a data-consistency
