@@ -8,11 +8,15 @@ method (the part that has to be right):
 - the roi is segmented ONCE on the fully-sampled ground truth and reused unchanged on
   every reconstruction. segmenting each recon separately would confound segmentation
   error with reconstruction error, so it is not done
-- features come from pyradiomics with ibsi-style settings (z-score normalize x100,
+- features come from pyradiomics with ibsi-style settings (whole-image z-score x100,
   fixed bin width, original + wavelet) when it is installed, else a self-contained
-  numpy fallback (first-order + a mask-aware glcm) so the study runs anywhere
+  numpy fallback (first-order + a mask-aware glcm) with the same whole-image z-score.
+  normalizing within the roi instead would pin first-order mean/variance to constants
+  and inflate their agreement, so it is done over the whole image
 - agreement between a recon feature and its ground-truth value is summarized per
   feature with lin's ccc and icc(2,1), then aggregated by feature class
+- significance via bootstrap 95% cis on the median ccc (resampling slices) and a paired
+  wilcoxon signed-rank test on the per-feature ccc (unrolled vs unet)
 - combat-lite capstone shows how much of the feature shift is a correctable systematic
   location/scale effect vs irreducible per-slice noise
 
@@ -110,15 +114,17 @@ def _as_float(v) -> float:
 
 
 def _fallback_features(img: np.ndarray, mask: np.ndarray, bin_width: float) -> dict:
-    """self-contained first-order + mask-aware glcm, ibsi z-score x100 discretization
+    """self-contained first-order + mask-aware glcm with ibsi-style normalization
 
     approximate vs pyradiomics (no wavelet/log filters) but mask-exact and runs with
     no extra install, so the stability methodology is demonstrable anywhere
     """
+    # whole-image z-score (matches pyradiomics normalize=True) then read the roi off the
+    # normalized image. normalizing within the roi would pin mean/variance/rms/energy to
+    # constants and make their ccc trivially 1.0, artificially inflating first-order
     v = img.astype(np.float64)
-    inside = v[mask]
-    mu, sd = inside.mean(), inside.std() + 1e-12
-    z = (inside - mu) / sd * 100.0
+    mu, sd = v.mean(), v.std() + 1e-12
+    z = ((v - mu) / sd * 100.0)[mask]
     feats = {
         "original_firstorder_Mean": float(z.mean()),
         "original_firstorder_Variance": float(z.var()),
@@ -145,7 +151,7 @@ def _entropy(z: np.ndarray, bin_width: float) -> float:
 def _masked_glcm(img: np.ndarray, mask: np.ndarray, bin_width: float) -> dict:
     """symmetric, normalized glcm counting only neighbor pairs both inside the mask"""
     v = img.astype(np.float64)
-    mu, sd = v[mask].mean(), v[mask].std() + 1e-12
+    mu, sd = v.mean(), v.std() + 1e-12          # whole-image z-score (pyradiomics normalize=True)
     z = (v - mu) / sd * 100.0
     base = z[mask].min()
     disc = np.floor((z - base) / bin_width).astype(int)
@@ -223,6 +229,66 @@ def icc_2_1(x: np.ndarray, y: np.ndarray) -> float:
     ms_err = ss_err / ((n - 1) * (k - 1) + 1e-12)
     denom = ms_rows + (k - 1) * ms_err + k * (ms_cols - ms_err) / n
     return float((ms_rows - ms_err) / denom) if abs(denom) > 1e-12 else float("nan")
+
+
+def _median_ccc(gt_arr, rec_m, keys, idx) -> float:
+    """median over features of the recon-vs-gt ccc on a (possibly resampled) slice set"""
+    cccs = []
+    for k in keys:
+        g, r = gt_arr[k][idx], rec_m[k][idx]
+        ok = np.isfinite(g) & np.isfinite(r)
+        if ok.sum() >= 3:
+            cccs.append(lin_ccc(g[ok], r[ok]))
+    return float(np.median(cccs)) if cccs else float("nan")
+
+
+def bootstrap_ccc(gt_arr, method_feats, keys, methods, pair=("unrolled", "unet"),
+                  n_boot=1000, seed=0):
+    """bootstrap 95% ci on the median-feature ccc per method (resampling slices) and on
+    the pairwise difference, so the modest ccc gaps come with honest uncertainty
+    """
+    rng = np.random.default_rng(seed)
+    rec = {m: {k: np.array([f.get(k, np.nan) for f in method_feats[m]], float) for k in keys}
+           for m in methods}
+    n = len(method_feats[methods[0]])
+    boot = {m: [] for m in methods}
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, n)
+        for m in methods:
+            boot[m].append(_median_ccc(gt_arr, rec[m], keys, idx))
+    boot = {m: np.asarray(b) for m, b in boot.items()}
+    out = {m: {"median_ccc": float(np.nanmedian(boot[m])),
+               "ci95": [float(np.nanpercentile(boot[m], 2.5)), float(np.nanpercentile(boot[m], 97.5))]}
+           for m in methods}
+    diff = None
+    if pair[0] in methods and pair[1] in methods:
+        d = boot[pair[0]] - boot[pair[1]]
+        diff = {"pair": f"{pair[0]} - {pair[1]}", "median": float(np.nanmedian(d)),
+                "ci95": [float(np.nanpercentile(d, 2.5)), float(np.nanpercentile(d, 97.5))],
+                "prob_positive": float(np.mean(d > 0))}
+    return out, diff
+
+
+def paired_wilcoxon(rows, pair=("unrolled", "unet")):
+    """paired wilcoxon signed-rank over per-feature ccc (radiomic features are collinear
+    and non-normal, so a nonparametric paired test is the right comparison)
+    """
+    by = {pair[0]: {}, pair[1]: {}}
+    for r in rows:
+        if r["method"] in by:
+            by[r["method"]][r["feature"]] = r["ccc"]
+    common = sorted(set(by[pair[0]]) & set(by[pair[1]]))
+    a = np.array([by[pair[0]][f] for f in common])
+    b = np.array([by[pair[1]][f] for f in common])
+    res = {"pair": f"{pair[0]} - {pair[1]}", "n_features": len(common),
+           "median_diff": float(np.median(a - b)) if common else float("nan"), "p_value": None}
+    if len(common) >= 6 and not np.allclose(a, b):
+        try:
+            from scipy.stats import wilcoxon
+            res["p_value"] = float(wilcoxon(a, b).pvalue)
+        except (ImportError, ValueError):
+            pass
+    return res
 
 
 # --- reconstruction over the validation set ------------------------------------
@@ -380,8 +446,13 @@ def run_and_report(cfg: dict, device, out_dir: str | Path) -> dict:
         b, a = combat_capstone(gt_arr, method_feats, keys, m)
         capstone[m] = {"median_ccc_before": round(b, 3), "median_ccc_after_combat": round(a, 3)}
 
+    # statistical rigor: bootstrap 95% ci on the median ccc + paired wilcoxon over features
+    boot, boot_diff = bootstrap_ccc(gt_arr, method_feats, keys, list(checkpoints.keys()))
+    wilcox = paired_wilcoxon(rows)
+
     report = {"accel": accel, "n_features": len(keys), "pyradiomics": HAVE_PYRADIOMICS,
-              "summary": summary, "combat": capstone}
+              "summary": summary, "combat": capstone,
+              "bootstrap": boot, "bootstrap_diff": boot_diff, "wilcoxon": wilcox}
     (out_dir / "radiomics_summary.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     _print_report(report)
@@ -405,3 +476,17 @@ def _print_report(report: dict) -> None:
             print(f"  {method:16s} before={c['median_ccc_before']:.3f}  "
                   f"after={c['median_ccc_after_combat']:.3f}  "
                   f"(gain = correctable systematic shift)")
+    boot = report.get("bootstrap")
+    if boot:
+        print("\nbootstrap 95% ci on median ccc (1000x resample over slices):")
+        for method, b in boot.items():
+            print(f"  {method:16s} {b['median_ccc']:.3f}  [{b['ci95'][0]:.3f}, {b['ci95'][1]:.3f}]")
+        d = report.get("bootstrap_diff")
+        if d:
+            sig = "excludes 0" if (d["ci95"][0] > 0 or d["ci95"][1] < 0) else "includes 0"
+            print(f"  {d['pair']}: {d['median']:+.3f}  95% ci [{d['ci95'][0]:+.3f}, {d['ci95'][1]:+.3f}]  "
+                  f"({sig}; P(>0)={d['prob_positive']:.3f})")
+    w = report.get("wilcoxon")
+    if w and w.get("p_value") is not None:
+        print(f"paired wilcoxon {w['pair']} over {w['n_features']} features: "
+              f"median diff {w['median_diff']:+.3f}, p={w['p_value']:.4f}")
