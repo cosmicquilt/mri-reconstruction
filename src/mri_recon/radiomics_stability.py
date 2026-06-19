@@ -136,6 +136,11 @@ def _fallback_features(img: np.ndarray, mask: np.ndarray, bin_width: float) -> d
         "original_firstorder_90Percentile": float(np.percentile(z, 90)),
         "original_firstorder_InterquartileRange": float(np.percentile(z, 75) - np.percentile(z, 25)),
         "original_firstorder_RootMeanSquared": float(np.sqrt(np.mean(z ** 2))),
+        "original_firstorder_Median": float(np.median(z)),
+        "original_firstorder_MeanAbsoluteDeviation": float(np.mean(np.abs(z - z.mean()))),
+        "original_firstorder_RobustMeanAbsoluteDeviation": float(_robust_mad(z)),
+        "original_firstorder_Range": float(z.max() - z.min()),
+        "original_firstorder_Uniformity": float(_uniformity(z, bin_width)),
     }
     feats.update(_masked_glcm(img, mask, bin_width))
     return feats
@@ -146,6 +151,20 @@ def _entropy(z: np.ndarray, bin_width: float) -> float:
     counts = np.bincount(disc - disc.min())
     p = counts[counts > 0] / counts.sum()
     return float(-(p * np.log2(p)).sum())
+
+
+def _uniformity(z: np.ndarray, bin_width: float) -> float:
+    disc = np.floor((z - z.min()) / bin_width).astype(int)
+    counts = np.bincount(disc - disc.min())
+    p = counts / counts.sum()
+    return float((p ** 2).sum())
+
+
+def _robust_mad(z: np.ndarray) -> float:
+    """mean absolute deviation over the 10-90 percentile core (robust to outliers)"""
+    lo, hi = np.percentile(z, 10), np.percentile(z, 90)
+    core = z[(z >= lo) & (z <= hi)]
+    return float(np.mean(np.abs(core - core.mean()))) if core.size else 0.0
 
 
 def _masked_glcm(img: np.ndarray, mask: np.ndarray, bin_width: float) -> dict:
@@ -177,11 +196,18 @@ def _masked_glcm(img: np.ndarray, mask: np.ndarray, bin_width: float) -> dict:
     mu_i, mu_j = (i_idx * glcm).sum(), (j_idx * glcm).sum()
     sig_i = np.sqrt(((i_idx - mu_i) ** 2 * glcm).sum()) + 1e-12
     sig_j = np.sqrt(((j_idx - mu_j) ** 2 * glcm).sum()) + 1e-12
+    s = i_idx + j_idx - mu_i - mu_j
     return {
         "original_glcm_Contrast": float(((i_idx - j_idx) ** 2 * glcm).sum()),
         "original_glcm_Homogeneity": float((glcm / (1.0 + np.abs(i_idx - j_idx))).sum()),
         "original_glcm_Energy": float((glcm ** 2).sum()),
         "original_glcm_Correlation": float(((i_idx - mu_i) * (j_idx - mu_j) * glcm).sum() / (sig_i * sig_j)),
+        "original_glcm_Dissimilarity": float((np.abs(i_idx - j_idx) * glcm).sum()),
+        "original_glcm_JointEntropy": float(-(glcm * np.log2(glcm + 1e-12)).sum()),
+        "original_glcm_ClusterShade": float(((s ** 3) * glcm).sum()),
+        "original_glcm_ClusterProminence": float(((s ** 4) * glcm).sum()),
+        "original_glcm_MaximumProbability": float(glcm.max()),
+        "original_glcm_Autocorrelation": float((i_idx * j_idx * glcm).sum()),
     }
 
 
