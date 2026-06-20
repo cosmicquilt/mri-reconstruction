@@ -136,13 +136,29 @@ ceiling, so its residual signal is better preserved. the point: the metric you o
 (pixel error) is not the metric that matters downstream, and a data-consistency
 constraint trades a little image-similarity for better biomarker fidelity.
 
+### across acceleration (4x / 6x / 8x)
+
+training matched models at 4x, 6x, and 8x and repeating the analysis maps *where*
+biomarkers survive:
+
+![radiomic feature stability vs acceleration: first-order features stay above the 0.85 line for the learned models through 8x, while glcm texture is below 0.85 at every rate and degrades steadily, the unrolled highest and the u-net lowest on texture throughout](docs/figures/radiomics_trajectory.png)
+
+first-order features are robust to acceleration (the learned models hold ~0.9, above the
+0.85 bar, all the way to 8x), but glcm texture is *already* fragile at 4x (~0.55-0.60,
+below 0.85) and only falls further. so the honest read is "first-order survives single-coil
+acceleration, texture does not at any of these rates," not a clean cliff. two things hold
+across the whole curve: the u-net sits *below* even zero-filled on texture at every
+acceleration (the smoothing-decorrelation effect is systematic, not an 8x fluke), and the
+unrolled's edge grows with acceleration, near-tied at 4x and clearest at 8x where the
+data-consistency prior matters most.
+
 *caveats: a self-contained ibsi-style extractor (first-order + glcm, no wavelet/glrlm,
 since pyradiomics does not build on the colab python); the roi is fixed on the ground
 truth, so these ccc values isolate reconstruction from segmentation and are an upper
 bound on full-workflow stability; 100 val slices, single-coil 8x. and in absolute terms
-the texture (glcm) cccs (~0.33-0.39) sit far below the ~0.85 reliability bar, so at 8x
-single-coil *both* models fail to preserve diagnostic texture, the unrolled simply
-degrades less. an earlier "u-net below zero-filled on first-order" result was an artifact
+the texture (glcm) cccs stay below the ~0.85 reliability bar at every rate (~0.6 at 4x
+down to ~0.35 at 8x), so across all tested single-coil accelerations *both* models fail to
+preserve diagnostic texture, the unrolled simply degrades less. an earlier "u-net below zero-filled on first-order" result was an artifact
 of per-roi normalization and vanished with whole-image normalization.*
 
 ## the pipeline (this is a pipeline, not a notebook)
