@@ -150,7 +150,11 @@ acceleration, texture does not at any of these rates," not a clean cliff. two th
 across the whole curve: the u-net sits *below* even zero-filled on texture at every
 acceleration (the smoothing-decorrelation effect is systematic, not an 8x fluke), and the
 unrolled's edge grows with acceleration, near-tied at 4x and clearest at 8x where the
-data-consistency prior matters most.
+data-consistency prior matters most. one clinical caveat for the curve: this texture
+fragility even at 4x is partly the single-coil setting. clinical accelerated mri uses
+multi-coil parallel imaging, whose spatial encoding mitigates the ill-posedness, so
+multi-coil texture would likely stay far more stable at 4x-6x. validating this trajectory
+on multi-coil data is the natural next step.
 
 *caveats: a self-contained ibsi-style extractor (first-order + glcm, no wavelet/glrlm,
 since pyradiomics does not build on the colab python); the roi is fixed on the ground
