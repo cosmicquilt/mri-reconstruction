@@ -235,6 +235,31 @@ def lin_ccc(x: np.ndarray, y: np.ndarray) -> float:
     return float(2 * cov / denom) if denom > 1e-12 else 1.0
 
 
+def ccc_components(x: np.ndarray, y: np.ndarray) -> dict:
+    """split lin's ccc into its precision and accuracy parts, ccc = precision * accuracy
+
+    precision is the pearson correlation (scatter about the best-fit line, the random/noise
+    term); accuracy is lin's bias-correction factor c_b in (0, 1] (how far that line sits from
+    the identity, the systematic part). a fragile feature with low precision failed by noise; one
+    with high precision but low accuracy failed by a correctable systematic shift. loc_shift (u)
+    and scale_shift (v) say which kind: u != 0 is a mean offset, v != 1 a spread change
+    """
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    mx, my, sx, sy = x.mean(), y.mean(), x.std(), y.std()
+    cov = ((x - mx) * (y - my)).mean()
+    denom = sx**2 + sy**2 + (mx - my) ** 2
+    ccc = float(2 * cov / denom) if denom > 1e-12 else 1.0
+    if sx < 1e-12 or sy < 1e-12:  # near-constant feature, precision/accuracy undefined
+        return {"ccc": ccc, "precision": float("nan"), "accuracy": float("nan"),
+                "loc_shift": float("nan"), "scale_shift": float("nan")}
+    precision = float(cov / (sx * sy))           # pearson r
+    v = float(sx / sy)                            # scale shift, 1 = matched spread
+    u = float((mx - my) / np.sqrt(sx * sy))       # location shift, 0 = matched mean
+    accuracy = float(2.0 / (v + 1.0 / v + u**2))  # lin's bias-correction factor c_b
+    return {"ccc": ccc, "precision": precision, "accuracy": accuracy,
+            "loc_shift": u, "scale_shift": v}
+
+
 def icc_2_1(x: np.ndarray, y: np.ndarray) -> float:
     """icc(2,1): two-way random effects, absolute agreement, single measurement
 
@@ -392,9 +417,12 @@ def run_stability_study(cfg, checkpoints, device, accel=8, cf=0.04, limit=120, b
             ok = np.isfinite(rec) & np.isfinite(gt_arr[k])
             if ok.sum() < 3:
                 continue
+            comp = ccc_components(gt_arr[k][ok], rec[ok])
             rows.append({
                 "method": m, "feature": k, "fclass": feature_class(k),
-                "ccc": lin_ccc(gt_arr[k][ok], rec[ok]),
+                "ccc": comp["ccc"],
+                "ccc_precision": comp["precision"],  # pearson, the noise term
+                "ccc_accuracy": comp["accuracy"],    # bias-correction c_b, the systematic term
                 "icc": icc_2_1(gt_arr[k][ok], rec[ok]),
             })
     return rows, gt_arr, method_feats, keys
@@ -422,18 +450,28 @@ def combat_capstone(gt_arr, method_feats, keys, method):
 
 
 def summarize(rows: list[dict]) -> dict:
-    """percent of features with ccc>0.85 and median ccc, per method overall and by class"""
-    buckets: dict[tuple, list[float]] = defaultdict(list)
+    """per method/class: %ccc>0.85, median ccc, and the median precision/accuracy split
+
+    the precision/accuracy medians say *how* a class loses agreement: a low median precision is
+    noise (scatter), a low median accuracy is a systematic shift (e.g. l1 over-smoothing bias)
+    """
+    cccs: dict[tuple, list[float]] = defaultdict(list)
+    prec: dict[tuple, list[float]] = defaultdict(list)
+    accu: dict[tuple, list[float]] = defaultdict(list)
     for r in rows:
-        buckets[(r["method"], r["fclass"])].append(r["ccc"])
-        buckets[(r["method"], "ALL")].append(r["ccc"])
+        for key in ((r["method"], r["fclass"]), (r["method"], "ALL")):
+            cccs[key].append(r["ccc"])
+            prec[key].append(r.get("ccc_precision", float("nan")))
+            accu[key].append(r.get("ccc_accuracy", float("nan")))
     out: dict[str, dict] = {}
-    for (method, fclass), cccs in buckets.items():
-        arr = np.array(cccs, float)
+    for (method, fclass), vals in cccs.items():
+        arr = np.array(vals, float)
         out.setdefault(method, {})[fclass] = {
             "n": int(arr.size),
             "pct_ccc_gt_0.85": round(100.0 * float(np.mean(arr > 0.85)), 1),
             "median_ccc": round(float(np.median(arr)), 3),
+            "median_precision": round(float(np.nanmedian(prec[(method, fclass)])), 3),
+            "median_accuracy": round(float(np.nanmedian(accu[(method, fclass)])), 3),
         }
     return out
 
@@ -460,7 +498,8 @@ def run_and_report(cfg: dict, device, out_dir: str | Path) -> dict:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_dir / "radiomics_per_feature.csv", "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["method", "feature", "fclass", "ccc", "icc"])
+        writer = csv.DictWriter(fh, fieldnames=["method", "feature", "fclass", "ccc",
+                                                "ccc_precision", "ccc_accuracy", "icc"])
         writer.writeheader()
         writer.writerows(rows)
 
@@ -489,12 +528,14 @@ def run_and_report(cfg: dict, device, out_dir: str | Path) -> dict:
 def _print_report(report: dict) -> None:
     print(f"\n=== radiomic feature stability vs ground truth, R={report['accel']}x "
           f"({report['n_features']} features, pyradiomics={report['pyradiomics']}) ===")
-    print("  higher ccc = more reproducible feature\n")
-    print(f"{'method':16s}{'class':12s}{'n':>4s}{'%ccc>0.85':>11s}{'median ccc':>12s}")
+    print("  higher ccc = more reproducible feature; ccc = precision x accuracy")
+    print("  precision = pearson (noise), accuracy = bias-correction c_b (systematic shift)\n")
+    print(f"{'method':16s}{'class':12s}{'n':>4s}{'%ccc>0.85':>11s}{'median ccc':>12s}{'precis':>8s}{'accur':>8s}")
     for method, classes in report["summary"].items():
         for fclass in ["ALL"] + sorted(k for k in classes if k != "ALL"):
             s = classes[fclass]
-            print(f"{method:16s}{fclass:12s}{s['n']:>4d}{s['pct_ccc_gt_0.85']:>11.1f}{s['median_ccc']:>12.3f}")
+            print(f"{method:16s}{fclass:12s}{s['n']:>4d}{s['pct_ccc_gt_0.85']:>11.1f}{s['median_ccc']:>12.3f}"
+                  f"{s.get('median_precision', float('nan')):>8.3f}{s.get('median_accuracy', float('nan')):>8.3f}")
         print()
     if report["combat"]:
         print("combat-lite capstone (median ccc, recon vs gt):")
