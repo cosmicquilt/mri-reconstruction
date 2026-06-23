@@ -1,0 +1,116 @@
+{
+  "n_seeds": 3,
+  "n_features": 25,
+  "median_ccc_unrolled": 0.8587,
+  "median_ccc_unet": 0.8413,
+  "mean_ccc_diff_unrolled_minus_unet": 0.0367,
+  "n_features_favoring_unrolled": 19,
+  "wilcoxon_p": 0.00012022256851196289,
+  "seeds": [
+    "seed1",
+    "seed2",
+    "seed3"
+  ],
+  "per_feature_seed_avg": {
+    "original_firstorder_10Percentile": {
+      "unrolled": 0.9035,
+      "unet": 0.8935
+    },
+    "original_firstorder_90Percentile": {
+      "unrolled": 0.9887,
+      "unet": 0.9866
+    },
+    "original_firstorder_Energy": {
+      "unrolled": 0.9368,
+      "unet": 0.9404
+    },
+    "original_firstorder_Entropy": {
+      "unrolled": 0.6697,
+      "unet": 0.5546
+    },
+    "original_firstorder_InterquartileRange": {
+      "unrolled": 0.8571,
+      "unet": 0.8471
+    },
+    "original_firstorder_Kurtosis": {
+      "unrolled": 0.7122,
+      "unet": 0.617
+    },
+    "original_firstorder_Mean": {
+      "unrolled": 0.994,
+      "unet": 0.9941
+    },
+    "original_firstorder_MeanAbsoluteDeviation": {
+      "unrolled": 0.941,
+      "unet": 0.9431
+    },
+    "original_firstorder_Median": {
+      "unrolled": 0.989,
+      "unet": 0.9834
+    },
+    "original_firstorder_Range": {
+      "unrolled": 0.85,
+      "unet": 0.8413
+    },
+    "original_firstorder_RobustMeanAbsoluteDeviation": {
+      "unrolled": 0.895,
+      "unet": 0.8932
+    },
+    "original_firstorder_RootMeanSquared": {
+      "unrolled": 0.9948,
+      "unet": 0.9949
+    },
+    "original_firstorder_Skewness": {
+      "unrolled": 0.8643,
+      "unet": 0.83
+    },
+    "original_firstorder_Uniformity": {
+      "unrolled": 0.4639,
+      "unet": 0.3245
+    },
+    "original_firstorder_Variance": {
+      "unrolled": 0.9686,
+      "unet": 0.9733
+    },
+    "original_glcm_Autocorrelation": {
+      "unrolled": 0.8709,
+      "unet": 0.8797
+    },
+    "original_glcm_ClusterProminence": {
+      "unrolled": 0.8587,
+      "unet": 0.8035
+    },
+    "original_glcm_ClusterShade": {
+      "unrolled": 0.8779,
+      "unet": 0.8479
+    },
+    "original_glcm_Contrast": {
+      "unrolled": 0.202,
+      "unet": 0.1604
+    },
+    "original_glcm_Correlation": {
+      "unrolled": 0.2073,
+      "unet": 0.1687
+    },
+    "original_glcm_Dissimilarity": {
+      "unrolled": 0.3119,
+      "unet": 0.2725
+    },
+    "original_glcm_Energy": {
+      "unrolled": 0.3789,
+      "unet": 0.2624
+    },
+    "original_glcm_Homogeneity": {
+      "unrolled": 0.3969,
+      "unet": 0.3718
+    },
+    "original_glcm_JointEntropy": {
+      "unrolled": 0.3867,
+      "unet": 0.3346
+    },
+    "original_glcm_MaximumProbability": {
+      "unrolled": 0.4445,
+      "unet": 0.3276
+    }
+  }
+}

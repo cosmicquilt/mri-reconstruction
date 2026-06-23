@@ -125,7 +125,10 @@ icc(2,1). significance comes from a paired wilcoxon test and a linear mixed-effe
 **despite the u-net's higher ssim/psnr, the unrolled preserves radiomic features
 significantly better** (+0.037 mean ccc; a paired test over 25 seed-averaged features
 gives p = 1.2e-4 with 19 of 25 favoring the unrolled, and a linear mixed-effects model
-agrees; all three seeds are individually wilcoxon-significant). the gap is
+agrees; all three seeds are individually wilcoxon-significant). **reproduce it from committed
+data:** the per-seed feature CCC tables live in `docs/radiomics/seed*/`, and
+`python scripts/aggregate_radiomics_seeds.py` seed-averages them and reruns the paired wilcoxon
+(p = 1.2e-4, 19/25) with no checkpoints or fastmri access. the gap is
 largest on **texture** (glcm, +0.058), consistent with l1 over-smoothing eroding the
 high-frequency detail glcm depends on, while first-order stability is comparable. the u-net even falls *below* zero-filled on
 texture: non-linear smoothing decorrelates texture features from the true content, whereas
