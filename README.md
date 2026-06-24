@@ -139,6 +139,31 @@ ceiling, so its residual signal is better preserved. the point: the metric you o
 (pixel error) is not the metric that matters downstream, and a data-consistency
 constraint trades a little image-similarity for better biomarker fidelity.
 
+### what kind of error: a precision/accuracy split
+
+lin's ccc factors as `precision x accuracy`: precision is the pearson correlation (random
+scatter, the noise term), accuracy is lin's bias-correction `c_b` (how far the recon-vs-truth
+cloud sits off the identity line, the systematic term). splitting each feature's ccc this way
+separates *why texture is fragile at all* from *why the methods differ*. texture fragility is an
+**accuracy** problem: glcm keeps high precision (~0.9 for every method) but low accuracy (~0.41),
+so the loss is systematic bias, not random noise, and the recon merely tracks the true texture
+ordering on a shifted line (which is also why combat, a location-scale correction, recovers most
+of it). the *method gap* is the **precision** sliver: the u-net's non-linear smoothing drops its
+glcm precision below even zero-filling (0.885 vs 0.911), while the unrolled's data-consistency
+keeps it highest (0.920). that is the decorrelation described above, now localized to one term.
+
+decomposing the bias one level deeper (per feature, into a mean-offset `u` and a spread-ratio
+`v`, with `1/c_b = 1 + (v + 1/v - 2)/2 + u^2/2`) refutes the obvious "smoothing compresses the
+texture range" guess. scale compression is only ~25-30% of the texture bias; it is **dominated
+by per-feature mean offsets**, and every one points where blurring predicts: the recon shows
+lower contrast, dissimilarity, and joint-entropy and higher homogeneity, energy, and
+glcm-correlation. so the texture bias is a *directionally coherent smoothing signature* carried
+in the mean of each feature, with hard spread compression confined to two features (contrast and
+correlation, whose between-slice spread collapses 5-6x). the figure splits each feature's
+accuracy loss into its location and scale parts.
+
+![per-feature decomposition of the glcm texture accuracy loss into a location (mean-offset) penalty and a scale (spread-mismatch) penalty for the unrolled recon at 8x: the location penalty is the larger contributor for every texture feature, and the scale penalty is negligible except for contrast and correlation](docs/figures/radiomics_texture_decomposition.png)
+
 ### across acceleration (4x / 6x / 8x)
 
 training matched models at 4x, 6x, and 8x and repeating the analysis maps *where*
