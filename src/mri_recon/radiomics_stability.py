@@ -421,8 +421,10 @@ def run_stability_study(cfg, checkpoints, device, accel=8, cf=0.04, limit=120, b
             rows.append({
                 "method": m, "feature": k, "fclass": feature_class(k),
                 "ccc": comp["ccc"],
-                "ccc_precision": comp["precision"],  # pearson, the noise term
-                "ccc_accuracy": comp["accuracy"],    # bias-correction c_b, the systematic term
+                "ccc_precision": comp["precision"],     # pearson, the noise term
+                "ccc_accuracy": comp["accuracy"],       # bias-correction c_b, the systematic term
+                "ccc_loc_shift": comp["loc_shift"],     # u: mean offset gt vs recon (0 = matched)
+                "ccc_scale_shift": comp["scale_shift"],  # v: std(gt)/std(recon) (>1 = recon compressed the spread)
                 "icc": icc_2_1(gt_arr[k][ok], rec[ok]),
             })
     return rows, gt_arr, method_feats, keys
@@ -499,7 +501,8 @@ def run_and_report(cfg: dict, device, out_dir: str | Path) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(out_dir / "radiomics_per_feature.csv", "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=["method", "feature", "fclass", "ccc",
-                                                "ccc_precision", "ccc_accuracy", "icc"])
+                                                "ccc_precision", "ccc_accuracy",
+                                                "ccc_loc_shift", "ccc_scale_shift", "icc"])
         writer.writeheader()
         writer.writerows(rows)
 
